@@ -160,6 +160,14 @@ class PredictedPokemonSet:
                 if not self.choice_item_logical():
                     return False
 
+            case "lifeorb":
+                expected_offensive_ev = maximum_ev() * 0.5
+                if (
+                    self.pkmn_set.evs[1] < expected_offensive_ev
+                    and self.pkmn_set.evs[3] < expected_offensive_ev
+                ):
+                    return False
+
             case "assaultvest":
                 if self.pkmn_set.ability != "klutz" and any(
                     all_move_json[mv][constants.CATEGORY]
@@ -178,11 +186,11 @@ class PredictedPokemonSet:
             if not damaging_move_is_utility(move_data):
                 match move_data[constants.CATEGORY]:
                     case constants.MoveCategory.PHYSICAL:
-                        if self.pkmn_set.evs[3] > 0:
+                        if self.pkmn_set.evs[3] > 6:
                             return False
 
                     case constants.MoveCategory.SPECIAL:
-                        if self.pkmn_set.evs[1] > 0:
+                        if self.pkmn_set.evs[1] > 6:
                             return False
 
                     case constants.MoveCategory.STATUS:
