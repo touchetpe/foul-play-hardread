@@ -183,7 +183,7 @@ class _FoulPlayConfig:
         )
 
         args = parser.parse_args()
-        self.websocket_uri = args.websocket_uri
+        self.websocket_uri = self.get_websocket(args.websocket_uri)
         self.username = args.ps_username
         self.password = args.ps_password
         self.avatar = args.ps_avatar
@@ -209,6 +209,15 @@ class _FoulPlayConfig:
         self.log_to_file = args.log_to_file
 
         self.validate_config()
+
+    @staticmethod
+    def get_websocket(websocket_uri) -> str:
+        if websocket_uri.lower().strip() in ["ps", "pokemonshowdown"]:
+            return "wss://sim3.psim.us/showdown/websocket"
+        elif websocket_uri.lower().strip() in ["local", "localhost"]:
+            return "ws://localhost:8000/showdown/websocket"
+        else:
+            return websocket_uri
 
     @property
     def format_spec(self) -> FormatSpec:
