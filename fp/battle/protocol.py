@@ -26,6 +26,11 @@ from fp.battle.inference import check_heavydutyboots
 
 logger = logging.getLogger(__name__)
 
+FROM_SLEEPTALK = [
+    "[from]sleeptalk",
+    "[from]movesleeptalk",
+]
+
 ITEMS_REVEALED_ON_SWITCH_IN = [
     # boosterenergy technically only revealed if pkmn has quarkdrive/protosynthesis
     # but if they don't have that it doesn't matter
@@ -50,6 +55,12 @@ SIDE_CONDITION_DEFAULT_DURATION = {
     constants.MIST: 5,
     constants.TAILWIND: 4,
 }
+
+
+def is_from_sleeptalk(msg: str) -> bool:
+    if normalize_name(msg) in FROM_SLEEPTALK:
+        return True
+    return False
 
 
 def remove_volatile(pkmn, volatile):
@@ -652,7 +663,7 @@ def move(battle, split_msg):
     )
 
     if (
-        any(msg == "[from]Sleep Talk" for msg in split_msg)
+        any(is_from_sleeptalk(msg) for msg in split_msg)
         and battle.gen.tracks_consecutive_sleep_talks
     ):
         pkmn.gen_3_consecutive_sleep_talks += 1
@@ -713,7 +724,7 @@ def move(battle, split_msg):
             )
             pkmn.volatile_statuses.append("gen1paralysisnullify")
 
-    if split_msg[-1] == "[from]Sleep Talk" or split_msg[-1] == "[from]move: Sleep Talk":
+    if is_from_sleeptalk(split_msg[-1]):
         move_object = pkmn.get_move(move_name)
         if move_object is None:
             pkmn.add_move(move_name)
@@ -861,19 +872,13 @@ def move(battle, split_msg):
     try:
         category = all_move_json[move_name][constants.CATEGORY]
         logger.info("Setting {}'s last used move: {}".format(pkmn.name, move_name))
-        if not any(
-            "[from]move: Sleep Talk" in msg or "[from]Sleep Talk" in msg
-            for msg in split_msg
-        ):
+        if not any(is_from_sleeptalk(msg) for msg in split_msg):
             side.last_used_move = LastUsedMove(
                 pokemon_name=pkmn.name, move=move_name, turn=battle.turn
             )
     except KeyError:
         category = None
-        if not any(
-            "[from]move: Sleep Talk" in msg or "[from]Sleep Talk" in msg
-            for msg in split_msg
-        ):
+        if not any(is_from_sleeptalk(msg) for msg in split_msg):
             side.last_used_move = LastUsedMove(
                 pokemon_name=pkmn.name, move=constants.DO_NOTHING_MOVE, turn=battle.turn
             )
