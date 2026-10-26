@@ -5,6 +5,11 @@ fp/search/main.py and fp/websocket_client.py are no-ops). Foul Play still handle
 the battle state and the action formatting; only the choice comes from elsewhere.
 
 HARDREAD_POLICY=llm   ask an OpenAI-compatible chat/completions endpoint (tools, tool_choice).
+HARDREAD_POLICY=student  argmax of the HardRead student network (tools/student/fp_student.py) on
+                      the same view / legal menu / turn / k; HARDREAD_STUDENT_CKPT (.npz, needs numpy
+                      in this venv) or HARDREAD_STUDENT_URL (tools/student/infer.py serve sidecar).
+HARDREAD_POLICY_ONLY_PREFIX  if set, only bots whose username starts with it use the policy
+                      (lets one side of a run_match.py game be the policy and the other plain Foul Play).
 
 Observation parity with the SFT data (tools/dataset/extract.py + tools/sft/serialize.py):
   view     built by fp.hardread_decision_log._side/_pkmn on the same battle copy the search
@@ -53,7 +58,8 @@ logger = logging.getLogger(__name__)
 _POLICY = os.environ.get("HARDREAD_POLICY") or None
 _LOG_PATH = os.environ.get("HARDREAD_POLICY_LOG")
 _LOG_HISTORY = os.environ.get("HARDREAD_POLICY_LOG_HISTORY") == "1"
-POLICIES = ("llm",)
+POLICIES = ("llm", "student")
+_ONLY_PREFIX = os.environ.get("HARDREAD_POLICY_ONLY_PREFIX") or None
 
 _lock = threading.Lock()
 _history = defaultdict(list)  # battle_tag -> raw protocol lines received on our channel
@@ -62,7 +68,12 @@ _serializer = None
 
 
 def enabled():
-    return _POLICY is not None
+    if _POLICY is None:
+        return False
+    if _ONLY_PREFIX:
+        from fp.config import FoulPlayConfig
+        return str(getattr(FoulPlayConfig, "username", "")).startswith(_ONLY_PREFIX)
+    return True
 
 
 # ---------------------------------------------------------------- history capture
@@ -234,12 +245,25 @@ def choose(battle):
     try:
         if not legal:
             raise PolicyFailure("no_legal_actions")
-        try:
-            example = _load_serializer().build_example(
-                view, history, legal, player, turn, k, battle.team_preview, task="action")
-        except Exception as e:
-            raise PolicyFailure("serialize_error", repr(e))
-        action, info = _llm_choose(example, legal)
+        if _POLICY == "student":
+            try:
+                student_dir = os.environ.get("HARDREAD_STUDENT_DIR") or str(
+                    Path(__file__).resolve().parents[2] / "tools" / "student")
+                if student_dir not in sys.path:
+                    sys.path.insert(0, student_dir)
+                from fp_student import student_choose
+                action, info = student_choose(view, legal, turn, k, battle.team_preview, history, player)
+            except Exception as e:
+                raise PolicyFailure("student_error", repr(e))
+            if action not in legal:
+                raise PolicyFailure("illegal_id", repr(action))
+        else:
+            try:
+                example = _load_serializer().build_example(
+                    view, history, legal, player, turn, k, battle.team_preview, task="action")
+            except Exception as e:
+                raise PolicyFailure("serialize_error", repr(e))
+            action, info = _llm_choose(example, legal)
         rec.update(info)
     except PolicyFailure as e:
         failure = e
