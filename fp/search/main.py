@@ -9,6 +9,7 @@ from fp.config import FoulPlayConfig
 from poke_engine import State as PokeEngineState, monte_carlo_tree_search, MctsResult
 
 from fp.search.poke_engine_helpers import battle_to_poke_engine_state
+from fp import hardread_decision_log
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +69,12 @@ def find_best_move(battle: Battle) -> str:
     logger.info(
         "Sampling {} battles at {}ms each".format(num_battles, search_time_per_battle)
     )
+    states = []
     with ProcessPoolExecutor(max_workers=FoulPlayConfig.parallelism) as executor:
         futures = []
         for index, (b, chance) in enumerate(battles):
             state = battle_to_poke_engine_state(b).to_string()
+            states.append(state)
             logger.debug("Calling with {} state: {}".format(index, state))
             fut = executor.submit(
                 get_result_from_mcts,
@@ -90,4 +93,11 @@ def find_best_move(battle: Battle) -> str:
 
     choice = select_move_from_mcts_results(mcts_results)
     logger.info("Choice: {}".format(choice))
+    if hardread_decision_log.enabled():
+        try:
+            hardread_decision_log.log_decision(
+                battle, battles, mcts_results, choice, search_time_per_battle, states
+            )
+        except Exception as e:  # logging must never break play
+            logger.warning(f"HardRead decision log failed: {e!r}")
     return choice
