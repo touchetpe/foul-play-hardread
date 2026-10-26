@@ -92,6 +92,14 @@ class PSWebsocketClient:
 
         guest_login = self.password is None
 
+        # HardRead patch: on a private local server (noguestsecurity), guests log in
+        # without contacting the public login server.
+        if guest_login and any(h in self.address for h in ("://localhost", "://127.0.0.1")):
+            await self.send_message("", ["/trn " + self.username + ",0,"])
+            logger.info("Logged in as local guest")
+            await asyncio.sleep(1)
+            return self.username
+
         if guest_login:
             response = requests.post(
                 self.login_uri,
