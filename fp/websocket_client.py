@@ -1,3 +1,4 @@
+import os
 import asyncio
 import websockets
 import requests
@@ -50,7 +51,8 @@ class PSWebsocketClient:
     async def receive_message(self):
         message = await self.websocket.recv()
         logger.debug("Received message from websocket: {}".format(message))
-        if hardread_policy.enabled():  # HardRead: capture battle history (default off)
+        if hardread_policy.enabled() or os.environ.get("HARDREAD_LEVER_SELECT") == "student-blend":
+            # HardRead: capture battle history (default off; the student-blend lever needs it too)
             hardread_policy.record(message)
         return message
 

@@ -100,7 +100,7 @@ def find_best_move(battle: Battle) -> str:
         logger.info("Iterations {}: {}".format(index, res.total_visits))
         mcts_results.append((res, chance, index))
 
-    choice = hardread_levers.select_move(mcts_results) or select_move_from_mcts_results(
+    choice = hardread_levers.select_move(mcts_results, battle) or select_move_from_mcts_results(
         mcts_results
     )
     logger.info("Choice: {}".format(choice))

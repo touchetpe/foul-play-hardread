@@ -9,6 +9,9 @@ HARDREAD_LEVER_SELECT   final move selection across sampled worlds
     argmax  play the move with the highest chance-weighted visit share
     value   among moves with >= 75% of the top visit share, play the highest
             chance-weighted mean search score
+    student-blend  q = (1 - lam) * visit share + lam * student policy (tools/student/fp_student.py),
+            then Foul Play's rule on q. Env: HARDREAD_STUDENT_DIR, HARDREAD_STUDENT_CKPT or
+            HARDREAD_STUDENT_URL, HARDREAD_STUDENT_LAMBDA (0.3), HARDREAD_STUDENT_SELECT (sample)
 HARDREAD_LEVER_WORLDS   worlds vs search time per world, at equal total compute
     fp           upstream (default)
     double-half  twice the worlds at half the time each
@@ -16,17 +19,23 @@ HARDREAD_LEVER_WORLDS   worlds vs search time per world, at equal total compute
 """
 import logging
 import os
+import sys
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 SELECT = os.environ.get("HARDREAD_LEVER_SELECT", "fp")
 WORLDS = os.environ.get("HARDREAD_LEVER_WORLDS", "fp")
-_SELECT_CHOICES = ("fp", "argmax", "value")
+_SELECT_CHOICES = ("fp", "argmax", "value", "student-blend")
 _WORLDS_CHOICES = ("fp", "double-half", "half-double")
 if SELECT not in _SELECT_CHOICES:
     raise ValueError(f"HARDREAD_LEVER_SELECT must be one of {_SELECT_CHOICES}, got {SELECT!r}")
 if WORLDS not in _WORLDS_CHOICES:
     raise ValueError(f"HARDREAD_LEVER_WORLDS must be one of {_WORLDS_CHOICES}, got {WORLDS!r}")
+if SELECT == "student-blend":
+    sys.path.insert(0, os.environ.get("HARDREAD_STUDENT_DIR",
+                                      str(Path(__file__).resolve().parents[2] / "tools" / "student")))
+    import fp_student  # noqa: E402
 
 
 def describe():
@@ -56,10 +65,18 @@ def aggregate(mcts_results):
     return share, mean_score
 
 
-def select_move(mcts_results):
+def select_move(mcts_results, battle=None):
     """Return the lever's choice, or None to keep Foul Play's own selection."""
     if SELECT == "fp":
         return None
+    if SELECT == "student-blend":
+        try:
+            share, _ = aggregate(mcts_results)
+            probs, _latency = fp_student.student_probs_for_battle(battle, sorted(share))
+            return fp_student.lever_select(mcts_results, probs)
+        except Exception as e:  # any student failure falls back to Foul Play's own rule
+            logger.warning(f"HardRead student-blend failed, using Foul Play's selection: {e!r}")
+            return None
     share, mean_score = aggregate(mcts_results)
     if SELECT == "argmax":
         choice = max(share, key=lambda m: (share[m], mean_score[m]))
