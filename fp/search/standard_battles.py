@@ -15,6 +15,7 @@ from fp.data.sets import (
     RAW_COUNT,
     TEAMMATES,
 )
+from fp.hardread_oracle import get_oracle
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +309,13 @@ def prepare_battles(battle: Battle, num_battles: int) -> list[(Battle, float)]:
         sample_pokemon(battle_copy.opponent.active, battle.mode)
         for pkmn in filter(lambda x: x.is_alive(), battle_copy.opponent.reserve):
             sample_pokemon(pkmn, battle.mode)
+
+        # HardRead: evaluator-only oracle for value-of-information experiments
+        oracle = get_oracle()
+        if oracle is not None:
+            oracle.apply(battle_copy.opponent.active)
+            for pkmn in filter(lambda x: x.is_alive(), battle_copy.opponent.reserve):
+                oracle.apply(pkmn)
 
         if not battle.gen.has_team_preview:
             populate_standardbattle_unrevealed_pkmn(battle_copy)
