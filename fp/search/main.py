@@ -10,6 +10,8 @@ from poke_engine import State as PokeEngineState, monte_carlo_tree_search, MctsR
 
 from fp.search.poke_engine_helpers import battle_to_poke_engine_state
 from fp import hardread_decision_log
+from fp import hardread_policy
+from fp import hardread_levers
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +64,14 @@ def find_best_move(battle: Battle) -> str:
         battle.user.active = battle.user.reserve.pop(0)
         battle.opponent.active = battle.opponent.reserve.pop(0)
 
+    if hardread_policy.enabled():  # HardRead: external policy instead of MCTS (default off)
+        return hardread_policy.choose(battle)
+
     num_battles, search_time_per_battle = battle.mode.search_params(battle)
+    # HardRead engine levers (default off: returns its inputs unchanged)
+    num_battles, search_time_per_battle = hardread_levers.search_params(
+        num_battles, search_time_per_battle, FoulPlayConfig.parallelism
+    )
     battles = battle.mode.prepare_battles(battle, num_battles)
 
     logger.info("Searching for a move using MCTS...")
@@ -91,7 +100,9 @@ def find_best_move(battle: Battle) -> str:
         logger.info("Iterations {}: {}".format(index, res.total_visits))
         mcts_results.append((res, chance, index))
 
-    choice = select_move_from_mcts_results(mcts_results)
+    choice = hardread_levers.select_move(mcts_results) or select_move_from_mcts_results(
+        mcts_results
+    )
     logger.info("Choice: {}".format(choice))
     if hardread_decision_log.enabled():
         try:

@@ -6,6 +6,8 @@ import time
 
 import logging
 
+from fp import hardread_policy
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +50,8 @@ class PSWebsocketClient:
     async def receive_message(self):
         message = await self.websocket.recv()
         logger.debug("Received message from websocket: {}".format(message))
+        if hardread_policy.enabled():  # HardRead: capture battle history (default off)
+            hardread_policy.record(message)
         return message
 
     async def send_message(self, room, message_list):

@@ -14,6 +14,9 @@ import time
 
 _PATH = os.environ.get("HARDREAD_DECISION_LOG")
 _LOG_STATES = os.environ.get("HARDREAD_LOG_STATES") == "1"
+# v3: Monte Carlo snapshot of Foul Play's own belief (its set sampler, after its in-place
+# damage-based pruning) for every visible opponent Pokemon. 0 disables it.
+_BELIEF_SAMPLES = int(os.environ.get("HARDREAD_LOG_BELIEF_SAMPLES", "0") or 0)
 
 
 def enabled():
@@ -64,6 +67,42 @@ def _options(options, total):
     ]
 
 
+def _belief_snapshot(battle, n):
+    """Histogram of n draws of Foul Play's set sampler per visible opponent Pokemon.
+
+    The global random state is saved and restored, so play is unchanged.
+    """
+    import random
+    from copy import deepcopy
+    from fp.search.standard_battles import sample_pokemon
+
+    state = random.getstate()
+    out = {}
+    try:
+        opp = [battle.opponent.active] + list(battle.opponent.reserve)
+        for p in opp:
+            if p is None or p.hp <= 0 or p.name in out:
+                continue
+            h = {"n": 0, "item": {}, "ability": {}, "tera": {}, "spread": {}, "moves": {}}
+            for _ in range(n):
+                q = deepcopy(p)
+                try:
+                    sample_pokemon(q, battle.mode)
+                except Exception:
+                    continue
+                h["n"] += 1
+                for key, val in (("item", q.item), ("ability", q.ability), ("tera", q.tera_type),
+                                 ("spread", f"{q.nature}|{','.join(str(e) for e in (q.evs or []))}")):
+                    val = str(val)
+                    h[key][val] = h[key].get(val, 0) + 1
+                for m in q.moves:
+                    h["moves"][m.name] = h["moves"].get(m.name, 0) + 1
+            out[p.name] = h
+    finally:
+        random.setstate(state)
+    return out
+
+
 def log_decision(battle, sampled, mcts_results, choice, search_time_ms, states=None):
     if not _PATH:
         return
@@ -85,8 +124,13 @@ def log_decision(battle, sampled, mcts_results, choice, search_time_ms, states=N
         if _LOG_STATES and states is not None:
             w["state"] = states[i]
         worlds.append(w)
+    belief = None
+    if _BELIEF_SAMPLES > 0:
+        t_b = time.time()
+        belief = _belief_snapshot(battle, _BELIEF_SAMPLES)
+        belief = {"samples": _BELIEF_SAMPLES, "ms": round(1000 * (time.time() - t_b)), "pkmn": belief}
     rec = {
-        "v": 2,
+        "v": 3 if belief is not None else 2,
         "t": time.time(),
         "battle_tag": battle.battle_tag,
         "turn": battle.turn,
@@ -100,5 +144,7 @@ def log_decision(battle, sampled, mcts_results, choice, search_time_ms, states=N
         "worlds": worlds,
         "choice": choice,
     }
+    if belief is not None:
+        rec["fp_belief"] = belief
     with open(_PATH, "a") as f:
         f.write(json.dumps(rec, default=str) + "\n")
