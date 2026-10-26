@@ -39,6 +39,13 @@ def _pkmn(p):
         "speed_range": [sr.min, None if sr.max == float("inf") else sr.max] if sr else None,
         "nature": getattr(p, "nature", None),
         "evs": list(getattr(p, "evs", []) or []),
+        # v2: every other field Foul Play's set sampler reads, so its belief can be rebuilt offline.
+        "level": getattr(p, "level", None),
+        "removed_item": getattr(p, "removed_item", None),
+        "impossible_abilities": sorted(getattr(p, "impossible_abilities", []) or []),
+        "can_have_choice_item": getattr(p, "can_have_choice_item", None),
+        "can_terastallize": getattr(p, "can_terastallize", None),
+        "original_ability": getattr(p, "original_ability", None),
     }
 
 
@@ -79,6 +86,7 @@ def log_decision(battle, sampled, mcts_results, choice, search_time_ms, states=N
             w["state"] = states[i]
         worlds.append(w)
     rec = {
+        "v": 2,
         "t": time.time(),
         "battle_tag": battle.battle_tag,
         "turn": battle.turn,
