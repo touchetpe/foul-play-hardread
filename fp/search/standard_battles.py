@@ -16,6 +16,7 @@ from fp.data.sets import (
     TEAMMATES,
 )
 from fp.hardread_oracle import get_oracle
+from fp import hardread_belief
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +296,12 @@ def populate_standardbattle_unrevealed_pkmn(battle: Battle):
 
 
 def prepare_battles(battle: Battle, num_battles: int) -> list[(Battle, float)]:
+    # HardRead: belief lever (off unless HARDREAD_LEVER_BELIEF is set; None = sample like upstream)
+    belief_pool = (
+        hardread_belief.pools(battle, num_battles, sample_pokemon)
+        if hardread_belief.enabled()
+        else None
+    )
     sampled_battles = []
     for index in range(num_battles):
         logger.info("Sampling battle {}".format(index))
@@ -306,9 +313,12 @@ def prepare_battles(battle: Battle, num_battles: int) -> list[(Battle, float)]:
                 battle.mode.smogon_sets,
             )
 
-        sample_pokemon(battle_copy.opponent.active, battle.mode)
-        for pkmn in filter(lambda x: x.is_alive(), battle_copy.opponent.reserve):
-            sample_pokemon(pkmn, battle.mode)
+        if belief_pool is not None:
+            hardread_belief.apply_world(battle_copy, belief_pool, sample_pokemon, battle.mode)
+        else:
+            sample_pokemon(battle_copy.opponent.active, battle.mode)
+            for pkmn in filter(lambda x: x.is_alive(), battle_copy.opponent.reserve):
+                sample_pokemon(pkmn, battle.mode)
 
         # HardRead: evaluator-only oracle for value-of-information experiments
         oracle = get_oracle()
