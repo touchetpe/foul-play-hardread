@@ -1,4 +1,6 @@
-> **HardRead fork note:** this branch is HardRead's fork of Foul Play by pmariglia. It will likely crash in games with Roaring Moon, which joined OU on 30 October, because its usage statistics predate that. HardRead's review adds a guard in its own code (`tools/review/fpenv.py` in [touchetpe/hardread](https://github.com/touchetpe/hardread)); the code here is unchanged. We haven't run it directly to confirm this.
+> **HardRead fork note:** this branch is HardRead's fork of Foul Play by pmariglia. Results HardRead reports were measured at the evaluated commit f061e63 (public id 175e591), before this fix.
+>
+> At 175e591 the bot crashes in games against a species missing from its usage table, such as Roaring Moon, which joined OU on 30 October. The error is `AttributeError: 'list' object has no attribute 'get'` in `SmogonSets.move_usage_rates`. This branch adds a small guard: a species with no statistics gets no moves to sample. In our seeded checks, sampling for species in the table didn't change. The guard stops the crash but adds no usage data for Roaring Moon. HardRead's review has its own guard (`tools/review/fpenv.py` in [touchetpe/hardread](https://github.com/touchetpe/hardread)).
 
 # Foul Play ![umbreon](https://play.pokemonshowdown.com/sprites/xyani/umbreon.gif)
 A Pokémon battle-bot that can play battles on [Pokemon Showdown](https://pokemonshowdown.com/).
