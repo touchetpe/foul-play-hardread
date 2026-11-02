@@ -1,3 +1,5 @@
+> **HardRead fork note:** this branch is HardRead's fork of Foul Play by pmariglia. It will likely crash in games with Roaring Moon, which joined OU on 30 October, because its usage statistics predate that. HardRead's review adds a guard in its own code (`tools/review/fpenv.py` in [touchetpe/hardread](https://github.com/touchetpe/hardread)); the code here is unchanged. We haven't run it directly to confirm this.
+
 # Foul Play ![umbreon](https://play.pokemonshowdown.com/sprites/xyani/umbreon.gif)
 A Pokémon battle-bot that can play battles on [Pokemon Showdown](https://pokemonshowdown.com/).
 
