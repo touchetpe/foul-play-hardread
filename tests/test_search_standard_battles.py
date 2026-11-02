@@ -571,6 +571,19 @@ class TestSamplePokemonMovesetWithKnownPkmnSet:
         moves = sample_pokemon_moveset_with_known_pkmn_set(pkmn, pkmn_set, self.mode)
         assert moves == ["earthquake", "stoneedge", "outrage", "dragonclaw"]
 
+    def test_pokemon_without_smogon_statistics_keeps_only_known_moves(self):
+        self.mode.smogon_sets.raw_pkmn_sets = {
+            "dragapult": {MOVES_STRING: [("uturn", 1.0)]}
+        }
+
+        pkmn = Pokemon("roaringmoon", 100)
+        pkmn.add_move("knockoff")
+
+        moves = sample_pokemon_moveset_with_known_pkmn_set(
+            pkmn, make_pkmn_set(), self.mode
+        )
+        assert moves == ["knockoff"]
+
 
 class TestSetMostLikelyHiddenPower:
     @pytest.fixture(autouse=True)

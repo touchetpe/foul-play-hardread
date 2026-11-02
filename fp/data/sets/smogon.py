@@ -289,9 +289,11 @@ class SmogonSets(PokemonSets):
     def move_usage_rates(self, pkmn: Pokemon) -> list[tuple[str, float]]:
         # (move, usage_rate) pairs sorted by usage; smogon stats carry no
         # move associations so this is the only moveset information available
-        return self.get_pkmn_by_name_in_dict(pkmn, self.raw_pkmn_sets).get(
-            MOVES_STRING, []
-        )
+        pkmn_stats = self.get_pkmn_by_name_in_dict(pkmn, self.raw_pkmn_sets)
+        if not pkmn_stats:
+            # a species with no statistics has no moves to sample
+            return []
+        return pkmn_stats.get(MOVES_STRING, [])
 
     def get_raw_count(self, pkmn_name) -> int | None:
         if pkmn_name not in self.all_pkmn_counts:
